@@ -48,6 +48,7 @@ def load_quant(model, checkpoint, wbits, groupsize=-1, fused_mlp=True, eval=True
 
     if eval:
         quant.make_quant_attn(model)
+        quant.make_quant_norm(model)
         if fused_mlp:
             quant.make_fused_mlp(model)
     if warmup_autotune:
