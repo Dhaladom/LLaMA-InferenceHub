@@ -48,7 +48,6 @@ def load_quant(model, checkpoint, wbits, groupsize=-1, fused_mlp=True, eval=True
 
     if eval:
         quant.make_quant_attn(model)
-        quant.make_quant_norm(model)
         if fused_mlp:
             quant.make_fused_mlp(model)
     if warmup_autotune:
@@ -61,8 +60,8 @@ def load_quant(model, checkpoint, wbits, groupsize=-1, fused_mlp=True, eval=True
 
     device_map = json.load(open("/home/ddl/LLaMA-InferenceHub/config/device_map.json", 'r'))
     model = accelerate.dispatch_model(model, device_map=device_map)     
+    model = llama_accelerate_path.apply_to_model(model)
     
-    # model = llama_accelerate_path.apply_to_model(model)
 
 
     print('Done.')
@@ -71,20 +70,21 @@ def load_quant(model, checkpoint, wbits, groupsize=-1, fused_mlp=True, eval=True
 
 def inference(model, tokenizer, input, gen_config, streamer=None):    
 
-    input_ids = tokenizer.encode(input, return_tensors="pt").to(torch.device('cuda:1'))
+    input_ids = tokenizer.encode(input, return_tensors="pt").to(torch.device('cuda:0'))
 
     generation_config = gen_config
     time1 = time()
     with torch.no_grad():
         generated_ids = model.generate(
             input_ids,
-            #streamer=streamer,
+            streamer=streamer,
            **generation_config
         )
 
     token_count = len(generated_ids[0]) - len(input_ids[0])
 
     output = tokenizer.decode([el.item() for el in generated_ids[0]])
+    print(f"Tokens: {token_count}")
     print(f"Tokens per second: {token_count / (time() - time1)}")
 
     return output
@@ -99,11 +99,11 @@ if __name__ == '__main__':
     model:str = load_quant(model_dir, model_file_path, wbits, groupsize, eval=True, warmup_autotune=True)
     tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=False)
     streamer = TextStreamer(tokenizer)
-    gen_config = GenerationConfig._dict_from_json_file("/home/ddl/LLaMA-InferenceHub/config/gen_default.json")
 
     while True:
 
-        prompt = "Hello, my name is"
+        prompt = input("Enter a prompt: ")
+        gen_config = GenerationConfig._dict_from_json_file("/home/ddl/LLaMA-InferenceHub/config/gen_default.json")
         output = inference(model, tokenizer, prompt, gen_config, streamer)
         print(output)
 

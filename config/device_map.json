@@ -17,10 +17,7 @@
     "model.layers.14": 0,
     "model.layers.15": 0,
     "model.layers.16": 0,
-    "model.layers.17.self_attn": 0,
-    "model.layers.17.mlp.down_proj": 0,
-    "model.layers.17.input_layernorm": 0,
-    "model.layers.17.post_attention_layernorm": 0,
+    "model.layers.17": 0,
     "model.layers.18": 0,
     "model.layers.19": 0,
     "model.layers.20": 0,
@@ -79,13 +76,10 @@
     "model.layers.73": 1,
     "model.layers.74": 1,
     "model.layers.75": 1,
-    "model.layers.77.self_attn": 1,
-    "model.layers.77.mlp.down_proj": 1,
-    "model.layers.77.input_layernorm": 1,
-    "model.layers.77.post_attention_layernorm": 1,
+    "model.layers.76": 1,
+    "model.layers.77": 1,
     "model.layers.78": 1,
     "model.layers.79": 1,
     "model.norm": 1,
-    "lm_head": 1,
-    "model.layers.76": 1
+    "lm_head": 0
 }
