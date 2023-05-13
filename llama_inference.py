@@ -1,6 +1,7 @@
 import torch
 import quant
 
+
 from utils import find_layers, DEV
 import transformers
 from transformers import AutoTokenizer, TextStreamer, GenerationConfig
@@ -58,8 +59,8 @@ def load_quant(model, checkpoint, wbits, groupsize=-1, fused_mlp=True, eval=True
     model.seqlen = 2048
     print('Done.')
 
-
-    device_map = json.load(open("/home/ddl/LLaMA-InferenceHub/config/device_map.json", 'r'))
+    device_map = accelerate.infer_auto_device_map(model, no_split_module_classes=['LlamaAttention'])
+    device_map = json.load(open("/home/ddl/LLaMA-InferenceHub/config/device_map_standart.json", 'r'))
     model = accelerate.dispatch_model(model, device_map=device_map)     
     model = llama_accelerate_path.apply_to_model(model)
     
