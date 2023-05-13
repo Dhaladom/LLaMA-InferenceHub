@@ -1,3 +1,5 @@
+# What is TALIS?
+
 <u>T</u>riton <u>a</u>ccelerated <u>L</u>LaMA <u>i</u>nference <u>s</u>erver (**TALIS**) attempts to become a simple, fast and robust solution for serving LLaMA models via API with an emphasis on inference speed.
 
 This is a super<sup>super</sup> early version of TALIS. Dont expect it to work. For now it supports:
