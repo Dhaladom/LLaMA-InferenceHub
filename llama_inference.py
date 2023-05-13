@@ -9,6 +9,7 @@ from time import time
 
 import utils.llama_accelerate_path as llama_accelerate_path
 import json 
+from config.load_config import *
 
 
 def load_quant(model, checkpoint, wbits, groupsize=-1, fused_mlp=True, eval=True, warmup_autotune=True):
@@ -56,13 +57,10 @@ def load_quant(model, checkpoint, wbits, groupsize=-1, fused_mlp=True, eval=True
     model.seqlen = 2048
     print('Done.')
 
-    device_map = accelerate.infer_auto_device_map(model, no_split_module_classes=['LlamaAttention'])
-    device_map = json.load(open("/home/ddl/LLaMA-InferenceHub/config/device_map_standard.json", 'r'))
+    device_map = json.load(open(DEVICE_MAP, 'r'))
     model = accelerate.dispatch_model(model, device_map=device_map)     
     model = llama_accelerate_path.apply_to_model(model)
     
-
-
     print('Done.')
 
     return model
@@ -90,19 +88,19 @@ def inference(model, tokenizer, input, gen_config, streamer=None):
 
 if __name__ == '__main__':
 
-    model_dir: str = "/home/ddl/models/Neko-Institute-of-Science_LLaMA-65B-4bit-128g"
-    model_file_path: str = "/home/ddl/models/Neko-Institute-of-Science_LLaMA-65B-4bit-128g/gptq_model-4bit-128g.safetensors"
-    wbits: int = 4
-    groupsize: int = 128
+    model_dir: str = MODEL_DIR
+    checkpoints_path: str = CHECKPOINTS
+    wbits: int = WBITS
+    groupsize: int = GROUPSIZE
 
-    model:str = load_quant(model_dir, model_file_path, wbits, groupsize, eval=True, warmup_autotune=True)
+    model = load_quant(model_dir, checkpoints_path, wbits, groupsize, eval=True, warmup_autotune=True)
     tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=False)
     streamer = TextStreamer(tokenizer)
 
     while True:
 
         prompt = input("Enter a prompt: ")
-        gen_config = GenerationConfig._dict_from_json_file("/home/ddl/LLaMA-InferenceHub/config/gen_default.json")
+        gen_config = GenerationConfig._dict_from_json_file(GEN_CONFIG)
         output = inference(model, tokenizer, prompt, gen_config, streamer)
         print(output)
 
