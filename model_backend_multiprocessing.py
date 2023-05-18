@@ -10,6 +10,8 @@ from time import time
 import utils.llama_accelerate_path as llama_accelerate_path
 import json 
 from config.load_config import *
+from custom_stopping_criteria import UserStoppCriteria
+from transformers.generation.stopping_criteria import StoppingCriteriaList
 
 
 def load_quant(model, checkpoint, wbits, groupsize=-1, fused_mlp=True, eval=True, warmup_autotune=True):
@@ -65,44 +67,62 @@ def load_quant(model, checkpoint, wbits, groupsize=-1, fused_mlp=True, eval=True
 
     return model
 
-def inference(model, tokenizer, input, gen_config, streamer=None):    
-
-    input_ids = tokenizer.encode(input, return_tensors="pt").to(torch.device('cuda:0'))
-
-    generation_config = gen_config
+def generate(prompt, gen_config, model, tokenizer, streamer=None):    
+    input_ids = tokenizer.encode(prompt, return_tensors="pt").to(torch.device('cuda:0'))
     time1 = time()
     with torch.no_grad():
         generated_ids = model.generate(
             input_ids,
             streamer=streamer,
-           **generation_config
+           **gen_config
         )
+    output = tokenizer.decode([el.item() for el in generated_ids[0]])
 
     token_count = len(generated_ids[0]) - len(input_ids[0])
-
-    output = tokenizer.decode([el.item() for el in generated_ids[0]])
     print(f"Tokens: {token_count}")
     print(f"Tokens per second: {token_count / (time() - time1)}")
 
     return output
 
-if __name__ == '__main__':
+class LlamaInferenceBackend:
 
-    model_dir: str = MODEL_DIR
-    checkpoints_path: str = CHECKPOINTS
-    wbits: int = WBITS
-    groupsize: int = GROUPSIZE
+    def __init__(self,
+                 streamer_queue,
+                 model_dir=MODEL_DIR,
+                 checkpoints_path=CHECKPOINTS,
+                 wbits=WBITS, groupsize=GROUPSIZE,
+                 gen_config=GEN_CONFIG, 
+                 device_map=DEVICE_MAP):
 
-    model = load_quant(model_dir, checkpoints_path, wbits, groupsize, eval=True, warmup_autotune=True)
-    tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=False)
-    streamer = TextStreamer(tokenizer)
+        self.model_dir = model_dir
+        self.checkpoints_path = checkpoints_path
+        self.wbits = wbits
+        self.groupsize = groupsize
+        self.gen_config = gen_config
+        self.device_map = device_map
 
+        self.model = load_quant(self.model_dir, self.checkpoints_path, self.wbits, self.groupsize, eval=True, warmup_autotune=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_dir, use_fast=False)
+        from custom_streamer import TextIteratorStreamer
+        self.streamer = TextIteratorStreamer(self.tokenizer, streamer_queue)
+        self.gen_config = GenerationConfig._dict_from_json_file(self.gen_config)
+        self.gen_config = GenerationConfig.from_dict(self.gen_config)
+    
+    def prepare_generation(self, prompt, stopp_event, generation_config=None,):
+        if generation_config is None:
+            generation_config: dict = {}
+            generation_config["generation_config"] = self.gen_config
+            stopp_list = StoppingCriteriaList()
+            stopp_list.append(UserStoppCriteria(stopp_event))
+            generation_config["stopping_criteria"] = stopp_list
+        return generate(prompt, generation_config, self.model, self.tokenizer, self.streamer)
+    
+
+def model_worker(input_queue, output_queue, stopp_event, streamer_queue):
+    model = LlamaInferenceBackend(streamer_queue)
     while True:
-
-        prompt = input("Enter a prompt: ")
-        gen_config = GenerationConfig._dict_from_json_file(GEN_CONFIG)
-        output = inference(model, tokenizer, prompt, gen_config, streamer)
-        print(output)
+        prompt, gen_config = input_queue.get()
+        output_queue.put(model.prepare_generation(prompt, stopp_event, gen_config))
 
 
 
